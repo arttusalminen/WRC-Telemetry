@@ -1,11 +1,8 @@
-package utils;
+package wrc.telemetry.data.types;
 
-import utils.data.ParsedData;
+import generic.data.parsing.ByteParseUtils;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-
-public class TelemetryData implements ParsedData {
+public class WrcCustom1Data extends WrcData {
     private long PacketUid;
     private float GameTotalTime;
     private float GameDeltaTime;
@@ -63,8 +60,11 @@ public class TelemetryData implements ParsedData {
     private float VehicleSteering;
     private float VehicleHandbrake;
     private float StageCurrentTime;
-    private float StageCurrentDistance;
-    private float StageLength;
+    private double StageCurrentDistance;
+    private double StageLength;
+    private int LocationId;
+    private int RouteId;
+    private int VehicleClassId;
 
     public long getPacketUid() {
         return PacketUid;
@@ -294,20 +294,32 @@ public class TelemetryData implements ParsedData {
         return StageCurrentTime;
     }
 
-    public float getStageCurrentDistance() {
+    public double getStageCurrentDistance() {
         return StageCurrentDistance;
     }
 
-    public float getStageLength() {
+    public double getStageLength() {
         return StageLength;
     }
 
-    private TelemetryData() {
+    public int getLocationId() {
+        return LocationId;
+    }
+
+    public int getRouteId() {
+        return RouteId;
+    }
+
+    public int getVehicleClassId() {
+        return VehicleClassId;
+    }
+
+    private WrcCustom1Data() {
     }
 
     @Override
     public String toString() {
-        return "TelemetryData{" +
+        return "WrcSessionUpdateData{" +
                 "PacketUid=" + PacketUid +
                 ", GameTotalTime=" + GameTotalTime +
                 ", GameDeltaTime=" + GameDeltaTime +
@@ -367,93 +379,79 @@ public class TelemetryData implements ParsedData {
                 ", StageCurrentTime=" + StageCurrentTime +
                 ", StageCurrentDistance=" + StageCurrentDistance +
                 ", StageLength=" + StageLength +
+                ", LocationId=" + LocationId +
+                ", RouteId=" + RouteId +
+                ", VehicleClassId=" + VehicleClassId +
                 '}';
     }
 
-    public static TelemetryData parse(byte[] b) {
-        TelemetryData p = new TelemetryData();
-        p.PacketUid =  getLong(b, 0, 8);
-        p.GameTotalTime = getFloat(b, 8, 12);
-        p.GameDeltaTime = getFloat(b, 12, 16);
-        p.GameFrameCount = getLong(b, 16, 24);
-        p.ShiftlightsFraction = getFloat(b, 24, 28);
-        p.ShiftlightsRpmStart = getFloat(b, 28, 32);
-        p.ShiftlightsRpmEnd = getFloat(b, 32, 36);
+    public static WrcCustom1Data parse(byte[] b) {
+        WrcCustom1Data p = new WrcCustom1Data();
+        p.PacketUid =  ByteParseUtils.getLong(b, 0, 8);
+        p.GameTotalTime = ByteParseUtils.getFloat(b, 8, 12);
+        p.GameDeltaTime = ByteParseUtils.getFloat(b, 12, 16);
+        p.GameFrameCount = ByteParseUtils.getLong(b, 16, 24);
+        p.ShiftlightsFraction = ByteParseUtils.getFloat(b, 24, 28);
+        p.ShiftlightsRpmStart = ByteParseUtils.getFloat(b, 28, 32);
+        p.ShiftlightsRpmEnd = ByteParseUtils.getFloat(b, 32, 36);
         p.ShiftlightsRpmValid = b[36] != 0;
         p.VehicleGearIndex = b[37];
         p.VehicleGearIndexNeutral = b[38];
         p.VehicleGearIndexReverse = b[39];
         p.VehicleGearMaximum = b[40];
-        p.VehicleSpeed = getFloat(b, 41, 45);
-        p.VehicleTransmissionSpeed = getFloat(b, 45, 49);
-        p.VehiclePositionX = getFloat(b, 49, 53);
-        p.VehiclePositionY = getFloat(b, 53, 57);
-        p.VehiclePositionZ = getFloat(b, 57, 61);
-        p.VehicleVelocityX = getFloat(b, 61, 65);
-        p.VehicleVelocityY = getFloat(b, 65, 69);
-        p.VehicleVelocityZ = getFloat(b, 69, 73);
-        p.VehicleAccelerationX = getFloat(b, 73, 77);
-        p.VehicleAccelerationY = getFloat(b, 77, 81);
-        p.VehicleAccelerationZ = getFloat(b, 81, 85);
-        p.VehicleLeftDirectionX = getFloat(b, 85, 89);
-        p.VehicleLeftDirectionY = getFloat(b, 89, 93);
-        p.VehicleLeftDirectionZ = getFloat(b, 93, 97);
-        p.VehicleForwardDirectionX = getFloat(b, 97, 101);
-        p.VehicleForwardDirectionY = getFloat(b, 101, 105);
-        p.VehicleForwardDirectionZ = getFloat(b, 105, 109);
-        p.VehicleUpDirectionX = getFloat(b, 109, 113);
-        p.VehicleUpDirectionY = getFloat(b, 113, 117);
-        p.VehicleUpDirectionZ = getFloat(b, 117, 121);
-        p.VehicleHubPositionBl = getFloat(b, 121, 125);
-        p.VehicleHubPositionBr = getFloat(b, 125, 129);
-        p.VehicleHubPositionFl = getFloat(b, 129, 133);
-        p.VehicleHubPositionFr = getFloat(b, 133, 137);
-        p.VehicleHubVelocityBl = getFloat(b, 137, 141);
-        p.VehicleHubVelocityBr = getFloat(b, 141, 145);
-        p.VehicleHubVelocityFl = getFloat(b, 145, 149);
-        p.VehicleHubVelocityFr = getFloat(b, 149, 153);
-        p.VehicleCpForwardSpeedBl = getFloat(b, 153, 157);
-        p.VehicleCpForwardSpeedBr = getFloat(b, 157, 161);
-        p.VehicleCpForwardSpeedFl = getFloat(b, 161, 165);
-        p.VehicleCpForwardSpeedFr = getFloat(b, 165, 169);
-        p.VehicleBrakeTemperatureBl = getFloat(b, 169, 173);
-        p.VehicleBrakeTemperatureBr = getFloat(b, 173, 177);
-        p.VehicleBrakeTemperatureFl = getFloat(b, 177, 181);
-        p.VehicleBrakeTemperatureFr = getFloat(b, 181, 185);
-        p.VehicleEngineRpmMax = getFloat(b, 185, 189);
-        p.VehicleEngineRpmIdle = getFloat(b, 189, 193);
-        p.VehicleEngineRpmCurrent = getFloat(b, 193, 197);
-        p.VehicleThrottle = getFloat(b, 197, 201);
-        p.VehicleBrake = getFloat(b, 201, 205);
-        p.VehicleClutch = getFloat(b, 205, 209);
-        p.VehicleSteering = getFloat(b, 209, 213);
-        p.VehicleHandbrake = getFloat(b, 213, 217);
-        p.StageCurrentTime = getFloat(b, 217, 221);
-        p.StageCurrentDistance = getFloat(b, 221, 229);
-        p.StageLength = getFloat(b, 229, 237);
+        p.VehicleSpeed = ByteParseUtils.getFloat(b, 41, 45);
+        p.VehicleTransmissionSpeed = ByteParseUtils.getFloat(b, 45, 49);
+        p.VehiclePositionX = ByteParseUtils.getFloat(b, 49, 53);
+        p.VehiclePositionY = ByteParseUtils.getFloat(b, 53, 57);
+        p.VehiclePositionZ = ByteParseUtils.getFloat(b, 57, 61);
+        p.VehicleVelocityX = ByteParseUtils.getFloat(b, 61, 65);
+        p.VehicleVelocityY = ByteParseUtils.getFloat(b, 65, 69);
+        p.VehicleVelocityZ = ByteParseUtils.getFloat(b, 69, 73);
+        p.VehicleAccelerationX = ByteParseUtils.getFloat(b, 73, 77);
+        p.VehicleAccelerationY = ByteParseUtils.getFloat(b, 77, 81);
+        p.VehicleAccelerationZ = ByteParseUtils.getFloat(b, 81, 85);
+        p.VehicleLeftDirectionX = ByteParseUtils.getFloat(b, 85, 89);
+        p.VehicleLeftDirectionY = ByteParseUtils.getFloat(b, 89, 93);
+        p.VehicleLeftDirectionZ = ByteParseUtils.getFloat(b, 93, 97);
+        p.VehicleForwardDirectionX = ByteParseUtils.getFloat(b, 97, 101);
+        p.VehicleForwardDirectionY = ByteParseUtils.getFloat(b, 101, 105);
+        p.VehicleForwardDirectionZ = ByteParseUtils.getFloat(b, 105, 109);
+        p.VehicleUpDirectionX = ByteParseUtils.getFloat(b, 109, 113);
+        p.VehicleUpDirectionY = ByteParseUtils.getFloat(b, 113, 117);
+        p.VehicleUpDirectionZ = ByteParseUtils.getFloat(b, 117, 121);
+        p.VehicleHubPositionBl = ByteParseUtils.getFloat(b, 121, 125);
+        p.VehicleHubPositionBr = ByteParseUtils.getFloat(b, 125, 129);
+        p.VehicleHubPositionFl = ByteParseUtils.getFloat(b, 129, 133);
+        p.VehicleHubPositionFr = ByteParseUtils.getFloat(b, 133, 137);
+        p.VehicleHubVelocityBl = ByteParseUtils.getFloat(b, 137, 141);
+        p.VehicleHubVelocityBr = ByteParseUtils.getFloat(b, 141, 145);
+        p.VehicleHubVelocityFl = ByteParseUtils.getFloat(b, 145, 149);
+        p.VehicleHubVelocityFr = ByteParseUtils.getFloat(b, 149, 153);
+        p.VehicleCpForwardSpeedBl = ByteParseUtils.getFloat(b, 153, 157);
+        p.VehicleCpForwardSpeedBr = ByteParseUtils.getFloat(b, 157, 161);
+        p.VehicleCpForwardSpeedFl = ByteParseUtils.getFloat(b, 161, 165);
+        p.VehicleCpForwardSpeedFr = ByteParseUtils.getFloat(b, 165, 169);
+        p.VehicleBrakeTemperatureBl = ByteParseUtils.getFloat(b, 169, 173);
+        p.VehicleBrakeTemperatureBr = ByteParseUtils.getFloat(b, 173, 177);
+        p.VehicleBrakeTemperatureFl = ByteParseUtils.getFloat(b, 177, 181);
+        p.VehicleBrakeTemperatureFr = ByteParseUtils.getFloat(b, 181, 185);
+        p.VehicleEngineRpmMax = ByteParseUtils.getFloat(b, 185, 189);
+        p.VehicleEngineRpmIdle = ByteParseUtils.getFloat(b, 189, 193);
+        p.VehicleEngineRpmCurrent = ByteParseUtils.getFloat(b, 193, 197);
+        p.VehicleThrottle = ByteParseUtils.getFloat(b, 197, 201);
+        p.VehicleBrake = ByteParseUtils.getFloat(b, 201, 205);
+        p.VehicleClutch = ByteParseUtils.getFloat(b, 205, 209);
+        p.VehicleSteering = ByteParseUtils.getFloat(b, 209, 213);
+        p.VehicleHandbrake = ByteParseUtils.getFloat(b, 213, 217);
+        p.StageCurrentTime = ByteParseUtils.getFloat(b, 217, 221);
+        p.StageCurrentDistance = ByteParseUtils.getDouble(b, 221, 229);
+        p.StageLength = ByteParseUtils.getDouble(b, 229, 237);
+//        p.LocationId = ByteParseUtils.getInt(b, 237, 239);
+//        p.RouteId = ByteParseUtils.getInt(b, 239, 241);
+//        p.VehicleClassId = ByteParseUtils.getInt(b, 241, 243);
         return p;
     }
 
 
-    private static byte[] extractBytes(byte[] b, int start, int end) {
-        if (b.length < end) {
-            throw new IllegalArgumentException("Byte array does not have enough bytes.");
-        }
-
-        byte[] extractedBytes = new byte[end - start];
-        System.arraycopy(b, start, extractedBytes, 0, end - start);
-        return extractedBytes;
-    }
-
-    private static float getFloat(byte[] b, int start, int end) {
-        return ByteBuffer.wrap(extractBytes(b, start, end))
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .getFloat();
-    }
-
-    private static long getLong(byte[] b, int start, int end) {
-        return ByteBuffer.wrap(extractBytes(b, start, end))
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .getLong();
-    }
+    
 }

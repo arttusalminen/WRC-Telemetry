@@ -1,23 +1,18 @@
-package meika.poika.data.handlers;
+package wrc.telemetry.overlays;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.system.MemoryStack;
-import utils.data.DataHandler;
-import utils.TelemetryData;
-
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
+import generic.data.DataProvider;
+import wrc.telemetry.data.types.WrcCustom1Data;
 
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 import org.lwjgl.stb.STBImage;
 import org.lwjgl.system.*;
+import wrc.telemetry.data.types.WrcData;
+import generic.visuals.Overlay;
 
 import java.nio.*;
-import java.util.ArrayDeque;
-import java.util.Deque;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -25,30 +20,15 @@ import static org.lwjgl.opengl.GL30.glGenerateMipmap;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
-public class InputOverlay implements DataHandler<TelemetryData> {
+public class InputOverlay implements Overlay {
 
     private static final int BAR_HEIGHT = 100;
     private static final int BAR_WIDTH = 20;
     private static final int OVERLAY_WIDTH = 400;
     private static final int OVERLAY_HEIGHT = 200;
+    private static final Class<WrcCustom1Data> USED_DATA_CLASS = WrcCustom1Data.class;
 
     private static final String STEERING_WHEEL_PATH = "resources/steering_wheel.png";
-
-    private float deltaTime = 1f;
-    private long updatedAtMs = System.currentTimeMillis();
-
-    private float throttle;
-    private float brake;
-    private float handBrake;
-    private float steering;
-    private float clutch;
-
-
-    private float previousThrottle;
-    private float previousBrake;
-    private float previousHandBrake;
-    private float previousSteering;
-    private float previousClutch;
 
     private float renderThrottle;
     private float renderBrake;
@@ -57,28 +37,18 @@ public class InputOverlay implements DataHandler<TelemetryData> {
     private float renderClutch;
 
     // Visuals
-    private BufferedImage steeringWheelImage;
     private int steeringWheelId;
     // private BufferedImage renderSteeringWheelImage;
 
+    private final DataProvider<WrcData> dataProvider;
+
     long window;
-    Deque<Long> frameTimes = new ArrayDeque<>();
 
-
-    public InputOverlay() {
-
-        try {
-            steeringWheelImage = ImageIO.read(new File(STEERING_WHEEL_PATH));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        // LWJGL
-        Thread t = new Thread(this::renderLoop);
-        t.start();
+    public InputOverlay(DataProvider<WrcData> dataDataProvider) {
+        this.dataProvider = dataDataProvider;
     }
 
-    private void initLWJGL() {
+    public void init() {
         if (!glfwInit())
             throw new IllegalStateException("GLFW init failed");
 
@@ -122,48 +92,64 @@ public class InputOverlay implements DataHandler<TelemetryData> {
 
     }
 
-
     @Override
-    public synchronized void handleData(TelemetryData data) {
-        deltaTime = data.getGameDeltaTime();
-        updatedAtMs = System.currentTimeMillis();
-
-        previousBrake = brake;
-        previousSteering = steering;
-        previousThrottle = throttle;
-        previousHandBrake = handBrake;
-        previousClutch = clutch;
-
-        throttle = data.getVehicleThrottle();
-        brake = data.getVehicleBrake();
-        handBrake = data.getVehicleHandbrake();
-        steering = data.getVehicleSteering();
-        clutch = data.getVehicleClutch();
+    public void deinit() {
+        // NOP
     }
 
-    private void renderLoop() {
-        initLWJGL();
+    private void updateRenderValues() {
+        long curr = System.currentTimeMillis();
+        long updatedAtMs = dataProvider.dataLastUpdated();
 
-        while (!glfwWindowShouldClose(window)) {
-            long curr = System.currentTimeMillis();
-            renderThrottle = previousThrottle + (throttle - previousThrottle) * ((curr - updatedAtMs) / (deltaTime * 1000));
-            renderBrake = previousBrake + (brake - previousBrake) * ((curr - updatedAtMs) / (deltaTime * 1000));
-            renderHandBrake = previousHandBrake + (handBrake - previousHandBrake) * ((curr - updatedAtMs) / (deltaTime * 1000));
-            renderSteering = previousSteering + (steering - previousSteering) * ((curr - updatedAtMs) / (deltaTime * 1000));
-            renderClutch = previousClutch + (clutch - previousClutch) * ((curr - updatedAtMs) / (deltaTime * 1000));
+        if (curr - updatedAtMs > 1000) {
+            // TODO move to more appropriate place
+            dataProvider.clearData();
 
-            render();
+            renderThrottle = 0;
+            renderBrake = 0;
+            renderHandBrake = 0;
+            renderSteering = 0;
+            renderClutch = 0;
+            return;
+        }
+
+        WrcCustom1Data prev = dataProvider.getRecentlyAddedData(USED_DATA_CLASS, 1);
+        WrcCustom1Data now = dataProvider.getRecentlyAddedData(USED_DATA_CLASS, 0);
+
+        if (now == null || prev == null) {
+            renderThrottle = 0;
+            renderBrake = 0;
+            renderHandBrake = 0;
+            renderSteering = 0;
+            renderClutch = 0;
+        }
+        else {
+            renderThrottle = prev.getVehicleThrottle() + (now.getVehicleThrottle() - prev.getVehicleThrottle()) * ((curr - updatedAtMs) / (now.getGameDeltaTime() * 1000));
+            renderBrake = prev.getVehicleBrake() + (now.getVehicleBrake() - prev.getVehicleBrake()) * ((curr - updatedAtMs) / (now.getGameDeltaTime() * 1000));
+            renderHandBrake = prev.getVehicleHandbrake() + (now.getVehicleHandbrake() - prev.getVehicleHandbrake()) * ((curr - updatedAtMs) / (now.getGameDeltaTime() * 1000));
+            renderSteering = prev.getVehicleSteering() + (now.getVehicleSteering() - prev.getVehicleSteering()) * ((curr - updatedAtMs) / (now.getGameDeltaTime() * 1000));
+            renderClutch = prev.getVehicleClutch() + (now.getVehicleClutch() - prev.getVehicleClutch()) * ((curr - updatedAtMs) / (now.getGameDeltaTime() * 1000));
         }
     }
 
-    private void render() {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
+    public void render() {
+        updateRenderValues();
 
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
         glLoadIdentity();
 
+        drawBase();
+        drawThrottle();
+        drawBrake();
+        drawHandBrake();
+        drawClutch();
+        drawSteering();
 
+        glfwSwapBuffers(window); // swap the color buffers
+        glfwPollEvents();
+    }
 
-        // Base
+    private void drawBase() {
         glColor4f(0f,0f,0f, 0.5f);
         glBegin(GL_QUADS);
         glVertex2f(-1f, -1f);
@@ -171,9 +157,9 @@ public class InputOverlay implements DataHandler<TelemetryData> {
         glVertex2f(1f, 1f);
         glVertex2f(1f, -1f);
         glEnd();
+    }
 
-
-        // Throttle
+    private void drawThrottle() {
         glColor4f(0f,0f,0f, 0.8f);
         glBegin(GL_QUADS);
         glVertex2f(0.95f, -0.9f);
@@ -189,9 +175,9 @@ public class InputOverlay implements DataHandler<TelemetryData> {
         glVertex2f(0.8f, -0.9f + renderThrottle * 1.8f);
         glVertex2f(0.8f, -0.9f);
         glEnd();
+    }
 
-
-        // Brake
+    private void drawBrake() {
         glColor4f(0f,0f,0f, 0.8f);
         glBegin(GL_QUADS);
         glVertex2f(-0.75f, -0.9f);
@@ -207,27 +193,9 @@ public class InputOverlay implements DataHandler<TelemetryData> {
         glVertex2f(-0.6f, -0.9f + renderBrake * 1.8f);
         glVertex2f(-0.6f, -0.9f);
         glEnd();
+    }
 
-
-        // Handbrake
-        glColor4f(0f,0f,0f, 0.8f);
-        glBegin(GL_QUADS);
-        glVertex2f(-0.95f, -0.9f);
-        glVertex2f(-0.95f, 0.9f);
-        glVertex2f(-0.8f, 0.9f);
-        glVertex2f(-0.8f, -0.9f);
-        glEnd();
-
-        glColor3f(1f, 0f, 1f);
-        glBegin(GL_QUADS);
-        glVertex2f(-0.95f, -0.9f);
-        glVertex2f(-0.95f, -0.9f + renderHandBrake * 1.8f);
-        glVertex2f(-0.8f, -0.9f + renderHandBrake * 1.8f);
-        glVertex2f(-0.8f, -0.9f);
-        glEnd();
-
-
-        // Clutch
+    private void drawClutch() {
         glColor4f(0f,0f,0f, 0.8f);
         glBegin(GL_QUADS);
         glVertex2f(0.75f, -0.9f);
@@ -243,15 +211,32 @@ public class InputOverlay implements DataHandler<TelemetryData> {
         glVertex2f(0.6f, -0.9f + renderClutch * 1.8f);
         glVertex2f(0.6f, -0.9f);
         glEnd();
+    }
 
-        // Steering
+    private void drawHandBrake() {
+        glColor4f(0f,0f,0f, 0.8f);
+        glBegin(GL_QUADS);
+        glVertex2f(-0.95f, -0.9f);
+        glVertex2f(-0.95f, 0.9f);
+        glVertex2f(-0.8f, 0.9f);
+        glVertex2f(-0.8f, -0.9f);
+        glEnd();
+
+        glColor3f(1f, 0f, 1f);
+        glBegin(GL_QUADS);
+        glVertex2f(-0.95f, -0.9f);
+        glVertex2f(-0.95f, -0.9f + renderHandBrake * 1.8f);
+        glVertex2f(-0.8f, -0.9f + renderHandBrake * 1.8f);
+        glVertex2f(-0.8f, -0.9f);
+        glEnd();
+    }
+
+    private void drawSteering() {
 //        renderSimpleSteering();
         glColor4f(1f,1f,1f,1f);
         renderSteeringWheel();
-
-        glfwSwapBuffers(window); // swap the color buffers
-        glfwPollEvents();
     }
+
 
     private void renderSimpleSteering() {
         // Base
@@ -362,4 +347,6 @@ public class InputOverlay implements DataHandler<TelemetryData> {
         drawTexture(textureId,-widthInPixels/2,-widthInPixels/2,widthInPixels,widthInPixels);
         glPopMatrix();
     }
+
+
 }
