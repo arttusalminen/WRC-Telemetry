@@ -15,7 +15,8 @@ car class. The PB runs are saved in a file called BestRuns.txt.
 
 ## What it looks like
 ![Demo](https://github.com/arttusalminen/WRC-Telemetry/blob/main/for_readme/WRC%20Input%20Telemetry.gif)
-Delta time overlay is not visible in the gif.
+
+Delta time overlay is not visible in the gif, gif is of an older version of the app.
 
 ## Future Plans
 - Configuration that is actually usable
