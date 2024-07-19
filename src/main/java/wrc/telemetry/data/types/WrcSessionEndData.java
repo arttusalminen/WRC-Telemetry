@@ -19,8 +19,8 @@ public class WrcSessionEndData extends WrcData {
 
     public static WrcSessionEndData parse(byte[] b) {
         WrcSessionEndData p = new WrcSessionEndData();
-        p.StageCurrentTime = ByteParseUtils.getFloat(b, 0, 4);
-        p.StageCurrentDistance = ByteParseUtils.getDouble(b, 4, 12);
+        p.StageCurrentTime = ByteParseUtils.getFloat32(b, 24);
+        p.StageCurrentDistance = ByteParseUtils.getDouble64(b, 28);
         return p;
     }
 }

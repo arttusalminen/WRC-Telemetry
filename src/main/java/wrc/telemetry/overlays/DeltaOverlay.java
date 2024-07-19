@@ -1,50 +1,61 @@
 package wrc.telemetry.overlays;
 
-import wrc.telemetry.StageContainer;
+import generic.data.recording.DataRecorder;
+import wrc.telemetry.data.types.WrcData;
+import wrc.telemetry.data.types.WrcEssentialData;
+import wrc.telemetry.stages.StageContainer;
 import generic.data.DataProvider;
 import wrc.telemetry.data.types.WrcCustom1Data;
 import generic.visuals.Overlay;
+import wrc.telemetry.stages.StageRecordKey;
+import wrc.telemetry.stages.StageRecording;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.HashMap;
+import java.io.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 
 /**
  * Overlay that shows the delta to the best run.
- *
- * Note: This overlay is in early development and is not working as intended yet
- * TODO: Finish this overlay when WRC developers fix the data that is being sent from the game.
  */
 public class DeltaOverlay implements Overlay {
 
     private static final int OVERLAY_WIDTH = 400;
     private static final int OVERLAY_HEIGHT = 200;
 
+    private static final int TRENDS_SIZE = 15;
+
     long window;
 
-    private final DataProvider<WrcCustom1Data> dataProvider;
+    private final DataProvider<WrcData> dataProvider;
     private final StageContainer stageContainer;
 
     private JFrame frame;
     private JLabel label;
 
-    private Map<TelemetryKey, List<WrcCustom1Data>> bestRuns = new HashMap<>();
-
-
-    private List<WrcCustom1Data> bestRun = null;
+    private Optional<StageRecording> bestRun = Optional.empty();
+    long bestRunLastUpdated = 0;
     private int currentIndex = 0;
+    private float latestStageTime = 0;
+
+    private Deque<Double> trends = new ArrayDeque<>(TRENDS_SIZE);
+
+    private float lastDelta = 0;
+    private float lastTimeStamp = 0;
 
 
-    public DeltaOverlay(DataProvider<WrcCustom1Data> dataDataProvider, StageContainer stageContainer) {
+
+    public DeltaOverlay(DataRecorder<WrcData> dataDataProvider) {
         this.dataProvider = dataDataProvider;
-        this.stageContainer = stageContainer;
+        this.stageContainer = new StageContainer(dataDataProvider);
     }
 
     @Override
     public void init() {
+
+
+
         // Swing
         frame = new JFrame("Delta Overlay");
         frame.setUndecorated(true);
@@ -62,73 +73,72 @@ public class DeltaOverlay implements Overlay {
 
         // Without this, the window is draggable from any non transparent
         // point, including points  inside textboxes.
-        frame.getRootPane().putClientProperty("apple.awt.draggableWindowBackground", false);
+        frame.getRootPane().putClientProperty("apple.awt.draggableWindowBackground", true);
 
         frame.getContentPane().setLayout(new GridLayout());
         label = new JLabel();
-        label.setText("0.0 s");
+        label.setOpaque(true);
+        label.setText("     0.0 s      ");
         label.setBackground(Color.WHITE);
         label.setForeground(Color.BLACK);
         label.setSize(OVERLAY_WIDTH, OVERLAY_HEIGHT);
-        label.setFont(new Font(label.getFont().getName(), Font.PLAIN, 25));
+        label.setFont(new Font(label.getFont().getName(), Font.PLAIN, 40));
         label.setHorizontalAlignment(SwingConstants.CENTER);
 
-        frame.getContentPane().add(label);
+        frame.add(label, "grow, debug");
         frame.setVisible(true);
         frame.pack();
     }
 
     @Override
     public void render() {
-        WrcCustom1Data curr = dataProvider.getRecentlyAddedData(WrcCustom1Data.class, 0);
-        WrcCustom1Data prev = dataProvider.getRecentlyAddedData(WrcCustom1Data.class, 1);
-
-        if (curr == null || prev == null) {
-            return;
+        WrcCustom1Data latestTelemetryData = dataProvider.getRecentlyAddedData(WrcCustom1Data.class, 0);
+        // Not on stage
+        if (latestTelemetryData == null) {
+            resetInternalValues();
         }
 
-        boolean reloadBestRun = false;
-        TelemetryKey currKey = TelemetryKey.forData(curr);
-        if (curr.getStageLength() <= curr.getStageCurrentDistance() + 10) {
-            // Stage finished
-            if (!bestRuns.containsKey(new TelemetryKey(curr))) {
-                bestRuns.put(currKey, dataProvider.getAllData(WrcCustom1Data.class));
+        // Stage restarted etc.
+        else if (latestTelemetryData.getStageCurrentTime() < latestStageTime) {
+            resetInternalValues();
+            bestRun = stageContainer.getBestRun(StageRecordKey.forData(latestTelemetryData));
+            bestRunLastUpdated = stageContainer.getStagesLastUpdated();
+        }
+
+        // Stage changed
+        else if (bestRun.map(r -> !r.getKey().equals(StageRecordKey.forData(latestTelemetryData))).orElse(true)) {
+            resetInternalValues();
+            bestRun = stageContainer.getBestRun(StageRecordKey.forData(latestTelemetryData));
+            bestRunLastUpdated = stageContainer.getStagesLastUpdated();
+        }
+
+        // Stage container updated its values
+        else if (stageContainer.getStagesLastUpdated() > bestRunLastUpdated) {
+            resetInternalValues();
+            bestRun = stageContainer.getBestRun(StageRecordKey.forData(latestTelemetryData));
+            bestRunLastUpdated = stageContainer.getStagesLastUpdated();
+        }
+
+
+        float currentDelta = 0f;
+
+        List<WrcEssentialData> runData = bestRun.map(StageRecording::getRunData).orElse(List.of());
+
+        for (int i = currentIndex; i < runData.size(); i++) {
+            float stageProgress = latestTelemetryData.getStageProgress();
+            if (runData.get(i).getStageProgress() > stageProgress) {
+                currentDelta = latestTelemetryData.getStageCurrentTime() - runData.get(i).getStageCurrentTime();
+                currentIndex = i;
+                break;
             }
-            else if (bestRuns.get(currKey).getLast().getStageCurrentTime() > curr.getStageCurrentTime()) {
-                bestRuns.put(currKey, dataProvider.getAllData(WrcCustom1Data.class));
-            }
-
-            dataProvider.clearData();
-            reloadBestRun = true;
         }
+        calculateTrend(currentDelta,
+                latestTelemetryData != null ? latestTelemetryData.getStageCurrentTime() - lastTimeStamp : 0);
+        lastTimeStamp = latestTelemetryData != null ? latestTelemetryData.getStageCurrentTime() : 0;
+        latestStageTime = latestTelemetryData != null ? latestTelemetryData.getStageCurrentTime() : latestStageTime;
 
-        if (curr.getStageCurrentTime() < prev.getStageCurrentTime()) {
-            // Stage restarted / stage changed
-            dataProvider.clearData();
-            reloadBestRun = true;
-        }
-
-        if (reloadBestRun) {
-            bestRun = bestRuns.get(currKey);
-            currentIndex = 0;
-        }
-
-        if (bestRun == null)
-            frame.setVisible(false);
-        else if (!frame.isVisible()) {
-            frame.setVisible(true);
-
-            float delta = 0f;
-            for (int i = currentIndex; i < bestRun.size(); i++) {
-                double currDist = curr.getStageCurrentDistance();
-                if (bestRun.get(i).getStageCurrentDistance() > currDist) {
-                    delta = curr.getStageCurrentTime() - bestRun.get(i).getStageCurrentTime();
-                    currentIndex = i;
-                    break;
-                }
-            }
-            label.setText(String.format("%.2f s", delta));
-        }
+        label.setBackground(getColorFromTrend());
+        label.setText(String.format("%.2f s", currentDelta));
 
         frame.revalidate();
         frame.repaint();
@@ -139,33 +149,44 @@ public class DeltaOverlay implements Overlay {
 
     }
 
+    private void resetInternalValues() {
+        bestRun = Optional.empty();
+        currentIndex = 0;
+        latestStageTime = 0;
+        lastDelta = 0;
+        lastTimeStamp = 0;
+        trends.clear();
+    }
 
-    public static class TelemetryKey {
-        private final int country;
-        private final int stage;
-        private final int carClass;
-
-        TelemetryKey(WrcCustom1Data data) {
-            this.country = data.getLocationId();
-            this.stage = data.getRouteId();
-            this.carClass = data.getVehicleClassId();
+    private void calculateTrend(float delta, float passedTime) {
+        if (lastDelta == 0) {
+            trends.add(0d);
         }
+        else {
+            double trendCandidate = (delta - lastDelta) / passedTime;
+            if (Double.isNaN(trendCandidate)) {
+                return;
+            }
+            else if (trendCandidate > 1) {
+                trendCandidate = 1;
+            }
+            else if (trendCandidate < -1) {
+                trendCandidate = -1;
+            }
+            trends.add(trendCandidate);
 
-        public static TelemetryKey forData(WrcCustom1Data telemetryData) {
-            return new TelemetryKey(telemetryData);
         }
+        if (trends.size() > TRENDS_SIZE) {
+            trends.poll();
+        }
+        lastDelta = delta;
+    }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            TelemetryKey that = (TelemetryKey) o;
-            return country == that.country && stage == that.stage && carClass == that.carClass;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(country, stage, carClass);
-        }
+    private Color getColorFromTrend() {
+        double trend = trends.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+        int green = (int) (255 - (255 * Math.abs(Math.max(trend, 0))));
+        int red = (int) (255 - (255 * Math.abs(Math.min(trend, 0))));
+        int blue = 255 - (int) (255 * Math.min(Math.abs(trend), 1));
+        return new Color(red, green, blue);
     }
 }

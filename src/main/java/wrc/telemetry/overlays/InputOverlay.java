@@ -101,18 +101,6 @@ public class InputOverlay implements Overlay {
         long curr = System.currentTimeMillis();
         long updatedAtMs = dataProvider.dataLastUpdated();
 
-        if (curr - updatedAtMs > 1000) {
-            // TODO move to more appropriate place
-            dataProvider.clearData();
-
-            renderThrottle = 0;
-            renderBrake = 0;
-            renderHandBrake = 0;
-            renderSteering = 0;
-            renderClutch = 0;
-            return;
-        }
-
         WrcCustom1Data prev = dataProvider.getRecentlyAddedData(USED_DATA_CLASS, 1);
         WrcCustom1Data now = dataProvider.getRecentlyAddedData(USED_DATA_CLASS, 0);
 

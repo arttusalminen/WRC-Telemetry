@@ -52,14 +52,14 @@ public class WrcSessionStartData extends WrcData {
     @CheckForNull
     public static WrcSessionStartData parse(byte[] b) {
         WrcSessionStartData p = new WrcSessionStartData();
-        p.shiftlights_rpm_start = ByteParseUtils.getFloat(b, 0,4);
-        p.shiftlights_rpm_end = ByteParseUtils.getFloat(b, 4,8);
-        p.vehicle_gear_index_neutral = b[8];
-        p.vehicle_gear_index_reverse = b[9];
-        p.vehicle_gear_maximum = b[10];
-        p.vehicle_engine_rpm_max = ByteParseUtils.getFloat(b, 11, 15);
-        p.vehicle_engine_rpm_idle = ByteParseUtils.getFloat(b, 15, 19);
-        p.stage_length = ByteParseUtils.getDouble(b, 19, 27);
+        p.shiftlights_rpm_start = ByteParseUtils.getFloat32(b, 24);
+        p.shiftlights_rpm_end = ByteParseUtils.getFloat32(b, 28);
+        p.vehicle_gear_index_neutral = ByteParseUtils.getByte8(b, 32);
+        p.vehicle_gear_index_reverse = ByteParseUtils.getByte8(b, 33);
+        p.vehicle_gear_maximum = ByteParseUtils.getByte8(b, 34);
+        p.vehicle_engine_rpm_max = ByteParseUtils.getFloat32(b, 35);
+        p.vehicle_engine_rpm_idle = ByteParseUtils.getFloat32(b, 39);
+        p.stage_length = ByteParseUtils.getDouble64(b, 43);
         return p;
     }
 }
