@@ -21,7 +21,7 @@ import java.util.List;
  */
 public class DeltaOverlay implements Overlay {
 
-    private static final int OVERLAY_WIDTH = 400;
+    private static final int OVERLAY_WIDTH = 200;
     private static final int OVERLAY_HEIGHT = 200;
 
     private static final int TRENDS_SIZE = 15;
@@ -68,7 +68,7 @@ public class DeltaOverlay implements Overlay {
         int height = gd.getDisplayMode().getHeight();
 
         frame.setSize(OVERLAY_WIDTH, OVERLAY_HEIGHT);
-        frame.setLocation((width - OVERLAY_WIDTH / 2) / 2,
+        frame.setLocation(0,
                 0);
 
         // Without this, the window is draggable from any non transparent

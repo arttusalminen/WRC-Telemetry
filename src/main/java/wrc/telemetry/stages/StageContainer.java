@@ -20,7 +20,6 @@ public class StageContainer {
     public StageContainer(DataRecorder<WrcData> dataRecorder) {
         this.dataRecorder = dataRecorder;
         this.bestRuns = retrieveOldStages();
-        // Create a new timer that will run the stage container every 0.5 seconds
         Timer t = new Timer("StageContainer");
         TimerTask task = new TimerTask() {
             public void run() {
@@ -68,25 +67,31 @@ public class StageContainer {
     }
 
     private void handleStageEnding() {
-        List<WrcCustom1Data> thisRun = dataRecorder.getAllData(WrcCustom1Data.class);
-        if (thisRun.isEmpty()) {
-            return;
+        try {
+            List<WrcCustom1Data> thisRun = dataRecorder.getAllData(WrcCustom1Data.class);
+            if (thisRun.isEmpty()) {
+                return;
+            }
+
+            WrcCustom1Data lastData = thisRun.getLast();
+
+            StageRecording bestRun = bestRuns.get(new StageRecordKey(lastData));
+
+            switch (lastData.getStageStatus()) {
+                case StageResultStatus.NOT_FINISHED:
+                    break;
+                case StageResultStatus.FINISHED:
+                    if (timeFasterThanRun(lastData, bestRun)) {
+                        addToBestRuns(thisRun);
+                    }
+                    break;
+                default:
+                    break;
+            }
         }
 
-        WrcCustom1Data lastData = thisRun.getLast();
-
-        StageRecording bestRun = bestRuns.get(new StageRecordKey(lastData));
-
-        switch (lastData.getStageStatus()) {
-            case StageResultStatus.NOT_FINISHED:
-                break;
-            case StageResultStatus.FINISHED:
-                if (timeFasterThanRun(lastData, bestRun)) {
-                    addToBestRuns(thisRun);
-                }
-                break;
-            default:
-                break;
+        finally {
+            dataRecorder.clearData();
         }
     }
 
